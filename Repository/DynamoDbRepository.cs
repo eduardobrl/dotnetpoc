@@ -16,50 +16,73 @@ namespace dotnetPoc.Repository
         {
         }
 
-        public ParametrosDeBusca ObterComFiltros(List<Filter> filterlist)
+        public ParametrosDeBusca ObterComFiltros(FiltersParamsInput filtros)
         {
-            var parametrosDeBusca = ObterParametrosDeBusca(filterlist);
+            var listaDeFiltros = ListarFiltros(filtros);
+            var parametrosDeBusca = ObterParametrosDeBusca(listaDeFiltros);
 
             return parametrosDeBusca;
 
         }
 
+        private List<Filtro> ListarFiltros(FiltersParamsInput input)
+        {
+            List<Filtro> filtros = new List<Filtro>();
 
-        private ParametrosDeBusca ObterParametrosDeBusca(List<Filter> ListaDeFitros)
+            var proplist = input.GetType().GetProperties().Select(x => x.Name).ToList<string>();
+            
+
+            foreach (var propname in proplist)
+            {
+                var value = input.GetType().GetProperty(propname).GetValue(input);
+                var tablepropname = typeof(OperacaoDb).GetProperty(propname).GetCustomAttribute<DynamoDbPropertyAttribute>()?.Value;
+                var nomeindice = typeof(OperacaoDb).GetProperty(propname).GetCustomAttribute<DynamoDbIndexAttribute>()?.Value;
+                var nomerange = typeof(OperacaoDb).GetProperty(propname).GetCustomAttribute<DynamoDbRangeAttribute>()?.Value;
+
+
+                if(value != null)
+                {                
+                    filtros.Add(new Filtro(propname, tablepropname, value, nomeindice, nomerange));
+                }
+ 
+            }
+
+            return filtros;
+        }
+
+
+        private ParametrosDeBusca ObterParametrosDeBusca(List<Filtro> ListaDeFitros)
         {
             List<Index> indices = new List<Index>();
             List<Filtro> filtros = new List<Filtro>();
 
             foreach (var filtro in ListaDeFitros)
             {
-                var nomeindice = typeof(OperacaoDb).GetProperty(filtro.Field).GetCustomAttribute<DynamoDbIndexAttribute>()?.Value;
-                var prop = typeof(OperacaoDb).GetProperty(filtro.Field).GetCustomAttribute<DynamoDbPropertyAttribute>()?.Value;
-
-                var novoFiltro = new Filtro(prop, filtro.Value, filtro.Operator);
-
-                if(nomeindice != null && filtro.Operator == FilterOperator.EqualTo)
+                if(filtro.IndicesNomePk != null && filtro.Operacao == FilterOperator.EqualTo)
                 {
-                    var filtroSk = ObterRangeKeyParaIndice(ListaDeFitros, nomeindice);
+                    foreach (var ind in filtro.IndicesNomePk)
+                    {
+                        var filtroSk = ObterRangeKeyParaIndice(ListaDeFitros, ind);
 
-                    indices.Add(new Index {
-                        IndexName = nomeindice,
-                        Pk = novoFiltro,
-                        Sk = filtroSk
-                    });
+                        indices.Add(new Index {
+                            IndexName = ind,
+                            Pk = filtro,
+                            Sk = filtroSk
+                        });
+                    }
+
                 }
-
-                filtros.Add(novoFiltro);
-              
+             
             }
 
             var indice = ObterIndicePreferencial(indices);
 
 
-            filtros.Remove(indice.Pk);
-            filtros.Remove(indice.Sk);
+            ListaDeFitros.Remove(indice.Pk);
+            ListaDeFitros.Remove(indice.Sk);
 
             return new ParametrosDeBusca {
-                Filtros = filtros,
+                Filtros = ListaDeFitros,
                 Indice = indice
             };
 
@@ -102,18 +125,18 @@ namespace dotnetPoc.Repository
                 select indice).ToList().FirstOrDefault<Index>();
         }
 
-        private Filtro ObterRangeKeyParaIndice(List<Filter> ListaDeFitros, string indice)
+        private Filtro ObterRangeKeyParaIndice(List<Filtro> filtros, string indicePk)
         {
-            foreach (var filtro in ListaDeFitros)
+            foreach (var filtro in filtros)
             {
-                var range = typeof(OperacaoDb).GetProperty(filtro.Field).GetCustomAttribute<DynamoDbRangeAttribute>()?.Value;
-                var prop = typeof(OperacaoDb).GetProperty(filtro.Field).GetCustomAttribute<DynamoDbPropertyAttribute>()?.Value;
+                if(filtro.IndicesNomeSk == null)
+                    continue;
 
-                if(indice == range)
+                foreach (var indicesSk in filtro.IndicesNomeSk)
                 {
-                    return new Filtro(prop, filtro.Value, filtro.Operator);
+                    if(indicesSk == indicePk)
+                        return filtro;
                 }
-                
             }
 
             return null;
@@ -135,18 +158,26 @@ namespace dotnetPoc.Repository
 
     public class Filtro
     {
-        public string Propriedade { get; set; }
+        public string EntityProp { get; set; }
+
+        public string TableProp { get; set; }
 
         public FilterOperator Operacao { get; set; }
 
         public object Valor { get; set; }
 
-        public Filtro(string prop, object valor, FilterOperator op = FilterOperator.EqualTo)
-        {
-            Propriedade=prop;
-            Valor=valor;
-            Operacao=op;
+        public string[] IndicesNomePk { get; set; }
 
+        public string[] IndicesNomeSk { get; set; }
+
+        public Filtro(string entityprop, string dynamoprop, object valor, string[] indicesNomePk, string[] indicesNomeSk, FilterOperator op = FilterOperator.EqualTo)
+        {
+            EntityProp = entityprop;
+            TableProp = dynamoprop;
+            Valor = valor;
+            Operacao = op;
+            IndicesNomePk = indicesNomePk;
+            IndicesNomeSk = indicesNomeSk;
         }
     }
 

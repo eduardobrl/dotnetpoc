@@ -9,10 +9,15 @@ namespace dotnetPoc.Domain.Attributes
     {
         public DynamoDbRangeAttribute(string value)
         {
+            Value = new string[] { value };
+        }
+
+        public  DynamoDbRangeAttribute(string[] value)
+        {
             Value = value;
         }
 
-        public string Value { get; }
+        public string[] Value { get; }
     }
 
 }

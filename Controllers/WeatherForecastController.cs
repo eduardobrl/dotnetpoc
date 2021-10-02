@@ -38,18 +38,15 @@ namespace dotnetPoc.Controllers
 
             List<Filter> filters = new List<Filter>();
 
-            foreach (var propname in proplist)
-            {
-                var value = (string)param.GetType().GetProperty(propname).GetValue(param);
+            return this._dynamoRepo.ObterComFiltros(new FiltersParamsInput {
+                Cnpj = param.Cnpj,
+                Date = param.Date,
+                Name = param.Name,
+                Produto = param.Produto,
+                Status = param.Status,
+                Valor = Convert.ToDouble(param.Valor)
 
-                if(value != null)
-                {                
-                    filters.Add((Filter)$"{propname}={value}".ToFilter<FiltersParamsInput>());
-                }
- 
-            }
-
-            return this._dynamoRepo.ObterComFiltros(filters);
+            });
 
         }
 

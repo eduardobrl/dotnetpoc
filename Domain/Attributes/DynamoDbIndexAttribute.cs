@@ -9,9 +9,14 @@ namespace dotnetPoc.Domain.Attributes
     {
         public DynamoDbIndexAttribute(string value)
         {
-            Value = value;
+            Value = new string[] { value };
         }
 
-        public string Value { get; }
+        public DynamoDbIndexAttribute(string[] values)
+        {
+            Value = Value;
+        }
+
+        public string[] Value { get; }
     }
 }

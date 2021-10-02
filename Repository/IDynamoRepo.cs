@@ -9,6 +9,6 @@ namespace dotnetPoc.Repository
 {
     public interface IDynamoRepo
     {
-        ParametrosDeBusca ObterComFiltros(List<Filter> filterlist);
+        ParametrosDeBusca ObterComFiltros(FiltersParamsInput filtros);
     }
 }
